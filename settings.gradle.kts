@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "GitHubRepos"
-include (":app")
+include(":app")
