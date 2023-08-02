@@ -28,12 +28,10 @@ abstract class AuthUseCaseTest {
     object TestUtils {
         private const val ERROR_MESSAGE = "Error Message"
         private const val OWNER_NAME = "Owner Name"
-        const val VALID_TOKEN = "valid token"
-        const val INVALID_TOKEN = "invalid token"
-        val USER_INFO_SUCCESS = UserInfo.Success(OWNER_NAME)
-        val AUTH_RESULT_SUCCESS = AuthUseCase.AuthResult.Success(USER_INFO_SUCCESS)
+        const val VALID_TOKEN = "Valid Token"
+        const val INVALID_TOKEN = "Invalid Token"
+        val USER_INFO_SUCCESS = UserInfo.Success(ownerName = OWNER_NAME)
         val USER_INFO_ERROR = UserInfo.Error(message = ERROR_MESSAGE)
-        val AUTH_RESULT_ERROR = AuthUseCase.AuthResult.Error(USER_INFO_ERROR.message)
     }
 
     @Before
