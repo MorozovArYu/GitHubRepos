@@ -5,26 +5,18 @@ import dev.icerock.education.githubrepos.domain.AppRepository
 import dev.icerock.education.githubrepos.domain.model.UserInfo
 
 interface AuthUseCase {
-    suspend fun auth(authType: AuthType = AuthType.Auto): AuthResult
+    suspend fun auth(authType: AuthType = AuthType.Auto): UserInfo
 
     class Base(private val repository: AppRepository) : AuthUseCase {
-        override suspend fun auth(authType: AuthType): AuthResult {
-            return when (val userInfo = repository.signIn(authType.token)) {
-                is UserInfo.Success -> AuthResult.Success(userInfo)
-                is UserInfo.Error -> AuthResult.Error(userInfo.message)
-            }
+        override suspend fun auth(authType: AuthType): UserInfo {
+            val userInfo: UserInfo = repository.signIn(authType.token)
+            return userInfo
         }
 
     }
 
-
     sealed class AuthType(val token: String) {
         object Auto : AuthType(AppRepository.TYPE_AUTO)
         class Manual(token: String) : AuthType(token)
-    }
-
-    sealed interface AuthResult {
-        data class Success(private var userInfo: UserInfo) : AuthResult
-        data class Error(private var message: String) : AuthResult
     }
 }
