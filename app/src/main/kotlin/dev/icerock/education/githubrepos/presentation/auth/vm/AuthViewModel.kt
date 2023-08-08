@@ -9,6 +9,7 @@ import dev.icerock.education.githubrepos.domain.auth.AuthUseCase
 import dev.icerock.education.githubrepos.domain.model.UserInfo
 import dev.icerock.education.githubrepos.presentation.communication.Communication
 import dev.icerock.education.githubrepos.util.DispatchersList
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -41,41 +42,29 @@ interface AuthViewModel :
         AuthViewModel {
 
         init {
-            state.change(State.Idle)
             val token = keyValueStorage.token
-            if (token != null) {
-                viewModelScope.plus(dispatchers.IO).launch {
-                    state.change(State.Loading)
-                    try {
-                        interactor.auth(token)
-                        action.perform(Action.RouteToMain)
-                    } catch (ex: Exception) {
-                        action.perform(Action.ShowError("Error Message"))
-                    }
-
+            if (token == null) state.change(State.Idle)
+            else {
+                launchWithErrorHandle {
+                    interactor.auth(token)
+                    action.perform(Action.RouteToMain)
                 }
             }
-
         }
 
         override fun onSignButtonPressed(token: String) {
-            viewModelScope.plus(dispatchers.IO).launch {
+            launchWithErrorHandle {
                 state.change(State.Loading)
-                try {
-                    when (val userInfo = interactor.auth(token)) {
-                        is UserInfo.Success -> {
-                            action.perform(Action.RouteToMain)
-                            keyValueStorage.token = token
-                        }
-
-                        is UserInfo.Error -> {
-                            state.change(State.InvalidInput(userInfo.message))
-                        }
+                when (val userInfo = interactor.auth(token)) {
+                    is UserInfo.Success -> {
+                        action.perform(Action.RouteToMain)
+                        keyValueStorage.token = token
                     }
-                } catch (ex: Exception) {
-                    action.perform(Action.ShowError(ex.message.toString()))
-                }
 
+                    is UserInfo.Error -> {
+                        state.change(State.InvalidInput(userInfo.message))
+                    }
+                }
             }
         }
 
@@ -85,6 +74,17 @@ interface AuthViewModel :
 
         override fun observe(owner: LifecycleOwner, observer: Observer<State>) {
             state.observe(owner, observer)
+        }
+
+        private fun launchWithErrorHandle(block: suspend () -> Unit) {
+            val errorHandler = CoroutineExceptionHandler { _, throwable ->
+                viewModelScope.plus(dispatchers.IO).launch {
+                    action.perform(Action.ShowError(throwable.message.toString()))
+                }
+            }
+            viewModelScope.plus(dispatchers.IO).plus(errorHandler).launch {
+                block.invoke()
+            }
         }
 
 
