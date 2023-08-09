@@ -13,86 +13,31 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Before
 import kotlin.reflect.KClass
 
-class TestStateCommunication : Communication.MutableState<AuthViewModel.State> {
-    var lastState: AuthViewModel.State? = null
-    val statesList: MutableList<KClass<out AuthViewModel.State>> = mutableListOf()
-    override fun observe(
-        owner: LifecycleOwner, observer: Observer<AuthViewModel.State>
-    ) = Unit
-
-    override fun change(state: AuthViewModel.State) {
-        statesList.add(state::class)
-        this.lastState = state
-    }
-}
-
-class TestActionCommunication : Communication.MutableAction<AuthViewModel.Action> {
-    var action: AuthViewModel.Action? = null
-    override fun collect(collector: FlowCollector<AuthViewModel.Action>) = Unit
-    override suspend fun perform(action: AuthViewModel.Action) {
-        this.action = action
-    }
-}
-
-class TestKeyValueStorage : KeyValueStorage {
-    override var token: String? = null
-    fun setInvalidToken() {
-        token = AuthViewModelTest.TestUtils.INVALID_TOKEN
-    }
-
-    fun setValidToken() {
-        token = AuthViewModelTest.TestUtils.VALID_TOKEN
-    }
-}
-
-class TestAuthUseCase : AuthUseCase {
-    private var isError = false
-    fun setError() {
-        isError = true
-    }
-
-    override suspend fun auth(token: String): UserInfo {
-        if (isError) throw AuthViewModelTest.TestUtils.ERROR
-        return if (token == AuthViewModelTest.TestUtils.VALID_TOKEN) AuthViewModelTest.TestUtils.SUCCESS_USER_INFO else AuthViewModelTest.TestUtils.ERROR_USER_INFO
-    }
-}
-
-object TestDispatchers : DispatchersList {
-    @OptIn(ExperimentalCoroutinesApi::class)
-    override val IO = UnconfinedTestDispatcher()
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    override val MAIN = UnconfinedTestDispatcher()
-}
-
 abstract class AuthViewModelTest {
     protected lateinit var keyValueStorage: TestKeyValueStorage
     protected lateinit var interactor: TestAuthUseCase
     private lateinit var dispatchers: TestDispatchers
-    private lateinit var stateCommunication: TestStateCommunication
-    private lateinit var actionCommunication: TestActionCommunication
+    private lateinit var communication: TestCommunication
     protected val authViewModel
         get() = AuthViewModel.Base(
             interactor = interactor,
             keyValueStorage = keyValueStorage,
             dispatchers = dispatchers,
-            state = stateCommunication,
-            action = actionCommunication,
+            communication = communication,
         )
     protected val actualState
-        get() = stateCommunication.lastState
+        get() = communication.lastState
     protected val allPastStates
-        get() = stateCommunication.statesList
+        get() = communication.statesList
     protected val actualAction
-        get() = actionCommunication.action
+        get() = communication.action
 
     @Before
     fun setUp() {
         dispatchers = TestDispatchers
         keyValueStorage = TestKeyValueStorage()
         interactor = TestAuthUseCase()
-        stateCommunication = TestStateCommunication()
-        actionCommunication = TestActionCommunication()
+        communication = TestCommunication()
     }
 
     object TestUtils {
@@ -106,6 +51,56 @@ abstract class AuthViewModelTest {
     }
 }
 
+
+class TestCommunication :
+    Communication.Mutable<AuthViewModel.State, AuthViewModel.Action>{
+    var lastState: AuthViewModel.State? = null
+    var action: AuthViewModel.Action? = null
+    val statesList: MutableList<KClass<out AuthViewModel.State>> = mutableListOf()
+
+    override fun observeState(
+        owner: LifecycleOwner, observer: Observer<AuthViewModel.State>
+    ) = Unit
+
+    override fun changeState(state: AuthViewModel.State) {
+        statesList.add(state::class)
+        this.lastState = state
+    }
+
+    override fun collectAction(collector: FlowCollector<AuthViewModel.Action>) = Unit
+    override suspend fun performAction(action: AuthViewModel.Action) {
+        this.action = action
+    }
+
+    }
+class TestKeyValueStorage : KeyValueStorage {
+    override var token: String? = null
+    fun setInvalidToken() {
+        token = AuthViewModelTest.TestUtils.INVALID_TOKEN
+    }
+
+    fun setValidToken() {
+        token = AuthViewModelTest.TestUtils.VALID_TOKEN
+    }
+}
+class TestAuthUseCase : AuthUseCase {
+    private var isError = false
+    fun setError() {
+        isError = true
+    }
+
+    override suspend fun auth(token: String): UserInfo {
+        if (isError) throw AuthViewModelTest.TestUtils.ERROR
+        return if (token == AuthViewModelTest.TestUtils.VALID_TOKEN) AuthViewModelTest.TestUtils.SUCCESS_USER_INFO else AuthViewModelTest.TestUtils.ERROR_USER_INFO
+    }
+}
+object TestDispatchers : DispatchersList {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override val IO = UnconfinedTestDispatcher()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override val MAIN = UnconfinedTestDispatcher()
+}
 
 
 
