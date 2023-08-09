@@ -31,55 +31,53 @@ interface AuthViewModel :
         object RouteToMain : Action
     }
 
-
     class Base(
         private val interactor: AuthUseCase,
         private val keyValueStorage: KeyValueStorage,
         private val dispatchers: DispatchersList,
-        private val state: Communication.MutableState<State>,
-        private val action: Communication.MutableAction<Action>
+        private val communication: Communication.Mutable<State,Action>,
     ) : ViewModel(),
         AuthViewModel {
 
         init {
             val token = keyValueStorage.token
-            if (token == null) state.change(State.Idle)
+            if (token == null) communication.changeState(State.Idle)
             else {
                 launchWithErrorHandle {
                     interactor.auth(token)
-                    action.perform(Action.RouteToMain)
+                    communication.performAction(Action.RouteToMain)
                 }
             }
         }
 
         override fun onSignButtonPressed(token: String) {
             launchWithErrorHandle {
-                state.change(State.Loading)
+                communication.changeState(State.Loading)
                 when (val userInfo = interactor.auth(token)) {
                     is UserInfo.Success -> {
-                        action.perform(Action.RouteToMain)
+                        communication.performAction(Action.RouteToMain)
                         keyValueStorage.token = token
                     }
 
                     is UserInfo.Error -> {
-                        state.change(State.InvalidInput(userInfo.message))
+                        communication.changeState(State.InvalidInput(userInfo.message))
                     }
                 }
             }
         }
 
-        override fun collect(collector: FlowCollector<Action>) {
-            action.collect(collector)
+        override fun collectAction(collector: FlowCollector<Action>) {
+            communication.collectAction(collector)
         }
 
-        override fun observe(owner: LifecycleOwner, observer: Observer<State>) {
-            state.observe(owner, observer)
+        override fun observeState(owner: LifecycleOwner, observer: Observer<State>) {
+            communication.observeState(owner, observer)
         }
 
         private fun launchWithErrorHandle(block: suspend () -> Unit) {
             val errorHandler = CoroutineExceptionHandler { _, throwable ->
                 viewModelScope.plus(dispatchers.IO).launch {
-                    action.perform(Action.ShowError(throwable.message.toString()))
+                    communication.performAction(Action.ShowError(throwable.message.toString()))
                 }
             }
             viewModelScope.plus(dispatchers.IO).plus(errorHandler).launch {
